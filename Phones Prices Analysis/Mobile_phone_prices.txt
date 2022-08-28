@@ -1,0 +1,1171 @@
+---
+title: "Mobile Phones Price: a classification problem"
+author: 
+  - "Angelica Giangiacomi (2055739)"
+  - "Anthony Palmieri (2038503)"
+  - "Pietro Maria Sanguin (2063170)"
+date: "Statistical Learning course - 20/07/2022"
+output:
+  pdf_document:
+    toc: yes
+  '''''': default
+---
+ 
+ 
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+ 
+ 
+\section{Introduction}
+ 
+The arrival of summer usually leads to the purchase of new electronics. It is well known, in fact, that electronic devices, and in particular cell phones, become damaged especially when exposed to excessive heat, temperature changes, sand and salt, in short, all typical characteristics of the summer period. Given the pressing need to buy a new cell phone, we asked ourselves: what are the elements that most influence the price of a cell phone? A bigger screen, a larger battery capacity, a better performing ram, a better camera...? To give an answer as objective as possible, we looked at the "Mobile Price Classification dataset" in which the price ranges of some cell phones are listed. The name of the phone models considered are not specified, just as the year of production is not specified, however, other features useful for classification are present. Getting more technical, we are going to deal with a multiclass classification problem. In particular, we will analyze and study some attributes belonging to different cell phones with the purpose of determining the price range of each device, given its main qualities. The attributes at our disposal are many and, as we will see during the analysis, some of them will prove to be unnecessary for our purpose.
+First we are going to describe the dataset we used and then we will move on to the preprocessing and data cleaning parts in which we will prepare the data for the training phase. After that, before starting to train the actual multiclass classification models, we are going to study in more details what the data looks like, trying to identify some patterns and distributions that might be present within the dataset and trying to identify a priori which might be the most important features for determining the price range of a cell phone.
+After this first part of analysis, we finally start training some *Supervised Learning* models, specifically: *Multinomial Logistic Regression*, *Linear Discriminant Analysis*, *Quadratic Discriminant Analysis* and *K-Nearest Neighbours*. Each of these will be trained several times under different conditions, for example when applying feature selection techniques.
+ 
+ 
+# 1. The Dataset
+ 
+As stated before, the dataset used in this project is the "Mobile Price Classification" taken from the Kaggle website[1].
+Specifically, it consists of 2000 examples which we will split into Training and Test sets.
+ 
+```{r echo=TRUE, results=FALSE}
+ 
+# import the dataset
+phones_train <- read.csv('MobilePricesTrain.csv')
+attach(phones_train)
+ 
+```
+ 
+ 
+Each observation referers to a mobile phone and is characterized by means of 20 features, some of them numerical (i.e. non categorical) [N] others categorical [C] as specified below:
+ 
+1.    ***Battery_power:*** Total energy a battery can store in mAh [N]
+2.    ***Blue:*** Has bluetooth or not [C]
+3.    ***Clock_speed:*** Speed at which microprocessor executes instructions [N]
+4.    ***Dual_sim:*** Has dual sim support or not [C]
+5.    ***Fc:*** Front Camera mega pixels [N]
+6.    ***Four_g:*** Has 4G or not [C]
+7.    ***int_memory:*** Internal Memory in Gigabytes [N]
+8.    ***m_dep:*** Mobile Depth in cm [N]
+9.    ***mobile_wt:*** Weight of mobile phone [N]
+10.    ***n_cores:*** Number of cores of processor [N]
+11.    ***pc:*** Primary Camera mega pixels [N]
+12.    ***px_height:*** Pixel Resolution Height [N]
+13.    ***px_width:*** Pixel Resolution Width [N]
+14.    ***ram:*** Random Access Memory in Megabytes [N]
+15.    ***sc_h:*** Screen Height of mobile in cm [N]
+16.    ***sc_w:*** Screen Width of mobile in cm [N]
+17.    ***talk_time:*** Longest time that battery will last by a call [N]
+18.    ***three_g:*** Has 3G or not [C]
+19.    ***touch_screen:*** Has touch screen or not [C]
+20.    ***wifi:*** Has wifi or not [C]
+ 
+ 
+The main objective is to predict the price range of a given cell phone; the price ranges considered are 0, 1, 2, 3, which correspond to: Low cost, Medium cost, High cost, Very high cost. These will constitute the labels of our examples.
+In the following section we will discuss preprocessing and data cleaning.
+ 
+ 
+ 
+# 2. Preprocessing and data cleaning
+ 
+First of all, we check for missing data:
+ 
+```{r}
+ 
+# check for not available values
+cat("Is there any Not Available value?", any(is.na(phones_train)),"\n")
+ 
+# check for NaN values
+cat("Is there any Not a Number value?", any(is.nan(as.matrix(phones_train))))
+ 
+```
+There are no missing values.
+In order to implement model selection and evaluation strategies we randomly divide the original dataset into two disjoint subsets:
+ 
+- a training subset which we will use to train the parameters of our models (80% of original size);
+- a test set wich we will use to test the various algorithms (20% of original size).
+ 
+Eventually, on the training subset we will follow a cross validation approach to determine the optimal values of the hyperparameters (like regularization hyperparameters, for instance). We therefore proceed with the splitting:
+ 
+```{r}
+ 
+# percentage of samples instantiated for training
+p = 80
+# set random seed
+set.seed(1)
+# vector of indices to get examples for Training 
+my_smp = sample.int(nrow(phones_train), nrow(phones_train)*p/100, replace=FALSE)
+# 80% for Training set
+Training_set = phones_train[my_smp, ]
+# 20% for Test set
+Test_set = phones_train[-my_smp, ]
+ 
+```
+ 
+Now we separate the label column (i.e., the one for the ***price_range***) from the features.
+ 
+```{r}
+ 
+# get Training set labels
+y_train <- Training_set$price_range
+# remove labels column from Training set
+X_train <- Training_set[, -length(Training_set)]
+# get Test set labels
+y_test <- Test_set$price_range
+# remove labels column from Test set
+X_test <- Test_set[, -length(Test_set)]
+ 
+```
+
+As a next step, we check whether the data in the Training set is balanced across the different classes or not.
+ 
+```{r, fig.width=3.5, fig.height=3}
+ 
+# check if data is balanced
+barplot(table(Training_set$price_range), col = "orange", main = "Number of examples per class")
+ 
+```
+
+The data within the Training set is almost perfectly balanced, so there is no need to employ any oversampling (such as SMOTE) or undersampling method.
+Before performing any analysis on our dataset, it is necessary to transform the categorical variables into factors.
+ 
+```{r}
+ 
+# convert categorical variables to factors
+blue = as.factor(blue)
+dual_sim = as.factor(dual_sim)
+four_g = as.factor(four_g)
+three_g = as.factor(three_g)
+touch_screen = as.factor(touch_screen)
+wifi = as.factor(wifi)
+price_range = as.factor(price_range)
+ 
+```
+ 
+ 
+```{r, eval = FALSE, include=FALSE}
+ 
+# apply One-hot encoding
+library(mltools)
+library(data.table)
+ 
+phones_train <- one_hot(as.data.table(phones_train))
+ 
+```
+ 
+As a final step we also perform a standardization of the values of the non-categorical features to force them to be in the range [0,1].
+ 
+```{r echo=TRUE, results=FALSE, warning=FALSE}
+library(caret)
+``` 
+
+```{r, results='hide', warning=FALSE}
+
+# train MinMax Scaler on Training set
+scaling <- preProcess(X_train, method="range")
+# apply MinMax Scaler on Training set
+X_train_scaled <- predict(scaling, X_train)
+# apply MinMax Scaler on Test set
+X_test_scaled <- predict(scaling, X_test)
+ 
+```
+ 
+Before training any algorithm, we begin to explore our data, searching for relationships among the various predictors, in order to possibly apply variable selection techniques.
+ 
+# 3. Exploratory data analysis
+ 
+Since each observation consists of 20 features, in this section we plot some graphs to see if and what patterns and regularities exist among the various attributes in order to possibly identify those that are less useful for the analysis. To make the following plots more readable, some variables that had no correlation with any other were removed a priori.
+ 
+<!--
+Nel grafico di sotto teniamo le features sopravvissute alle due Forward e alla Backward selections.
+-->
+ 
+```{r echo=TRUE, results=FALSE, warning=FALSE}
+library(ellipse)
+```
+
+```{r, warning=FALSE}
+
+plotcorr(cor(phones_train[my_smp, c(1, 7, 10, 12, 13, 14, 9, 20, 16, 21)])) 
+ 
+```
+ 
+Surprisingly, there seem to be just a few variables correlated with each other, especially in the case of *price_range*, for which we find only one strong correlation with the feature *ram*. Probably this is strongly influenced by the fact that the price range is a discrete variable, thus observations referring to different cell phones and having even quite different features, yet belong to the same price range.
+ 
+To better highlight and observe the strong correlation between *ram* and *price_range*, let us first graph the distribution of *ram* with respect to the entire training set, and then for each of the four price ranges individually.
+ 
+```{r}
+ 
+# plot RAM distribution
+hist(X_train$ram, main="RAM distribution over Training set", freq=FALSE,  xlab="RAM (MB)")
+lines(density(X_train$ram), col = "Red", lwd = 2)
+ 
+```
+ 
+The diagram above shows a roughly uniform distribution except for the first bin, which has a lower density than the others.
+ 
+```{r}
+ 
+# set four subplots
+par(mfrow=c(2,2))
+ 
+# histogram related to label 0
+hist(X_train[y_train == 0, 14], main="RAM related to label: 0", xlab = "RAM (MB)", freq=FALSE)
+lines(density(X_train[y_train == 0, 14]), col = "Red", lwd = 2)
+ 
+# histogram related to label 1
+hist(X_train[y_train == 1, 14], main="RAM related to label: 1", xlab = "RAM (MB)", freq=FALSE)
+lines(density(X_train[y_train == 1, 14]), col = "Red", lwd = 2)
+ 
+# histogram related to label 2
+hist(X_train[y_train == 2, 14], main="RAM related to label: 2", xlab = "RAM (MB)", freq=FALSE)
+lines(density(X_train[y_train == 2, 14]), col = "Red", lwd = 2)
+ 
+# histogram related to label 3
+hist(X_train[y_train == 3, 14], main="RAM related to label: 3", xlab = "RAM (MB)", freq=FALSE)
+lines(density(X_train[y_train == 3, 14]), col = "Red", lwd = 2)
+ 
+par(mfrow=c(1,1))
+ 
+```
+ 
+Unlike the full distribution, in the plots above, the two middle classes (i.e., 1 and 2) have a bell-shaped distribution, while the lowest and highest bands (i.e., 0 and 3) have a right-skewed and a left-skewed distribution, respectively. If we wanted to treat the classes individually, for the latter two it would be better to proceed with a *log-transformation* to prevent the tails from affecting the training steps too much; however, during the analysis we will use the dataset as a whole, so it will not be necessary to apply such a method.
+ 
+Below, in an attempt to lighten the analysis, we study the Variance Inflation Factor (VIF) of the numerical attributes, to see if some features can be seen as linear combinations of others.
+ 
+
+```{r echo=TRUE, results=FALSE, warning=FALSE}
+library(fmsb)
+```
+
+```{r, warning=FALSE}
+
+# get only numerical features on Training set
+num_train = X_train[, -c(2,4,6,18,19,20)]
+num_train <- as.data.frame(num_train)
+ 
+# apply VIF on all features
+vifs = c()
+ 
+# loop over all numerical columns
+for( i in 1:length(num_train) )
+  { 
+    # First of all we want to create the formula x1~x2+x3+x4+... for each one of the columns
+    # We use this formula in the Linear Model function
+ 
+    # define a temporary dataframe having all columns but i-th one
+    tmp <- num_train[,-c(i)]
+    # define the string with the sum of all tmp's columns' names
+    j = paste(names(tmp), collapse="+")
+    lst = c(names(num_train)[i],j)
+    # create the final formula
+    formula = paste(lst, collapse='~')
+    # call Linear Model function
+    model = lm(formula, data = num_train)
+    # add to the list the current VIF value
+    vifs <- c(vifs, VIF(model)) 
+} 
+ 
+# print all VIFs values
+vifs
+ 
+```
+ 
+Since the values of the VIFs are all very close to 1, no important multicollinear relationships emerge among the numerical predictors. For this reason each model will be trained at first considering the whole set of features, and after that we will move on to apply also feature selection techniques.
+ 
+As a last thing, we check whether possible nonlinear relationships exist among the predictors. To make the plots more readable, we keep only those that are then found to be most important for the analysis. In the following plot, we use blue for class 0, red for class 1, yellow for class 2 and darkgreen for class 3. 
+ 
+```{r, eval=FALSE, include=FALSE}
+ 
+# check for non linear relations
+plot(Training_set[my_smp, c(1, 7, 12, 13, 14, 21)])
+ 
+```
+ 
+```{r}
+ 
+# check for non linear relations
+subset_for_plot <- phones_train[my_smp, c(1, 7, 12, 13, 14, 21)]
+cols <- character(nrow(subset_for_plot))
+cols[] <- "black"
+ 
+cols[subset_for_plot$price_range == 0] <- "blue"
+cols[subset_for_plot$price_range == 1] <- "red"
+cols[subset_for_plot$price_range == 2] <- "yellow"
+cols[subset_for_plot$price_range == 3] <- "darkgreen"
+ 
+pairs(subset_for_plot,col = cols, pch = 20)
+ 
+```
+ 
+As we can see, there seem to be no important nonlinear relationships among the features.
+In addition, the ram plots clearly show a strong correlation with the *price_range*, confirming what we already discussed above.
+In the following section we begin the actual analysis by training several algorithms.
+ 
+ 
+# 4. Training phase
+ 
+In this section we implement and discuss some different classification models: *Multinomial Logistic Regression*, *Linear Discriminant Analysis*, *Quadratic Discriminant Analysis* and *K-Nearest Neighbours*. For each of these models we will initially use all features, then we will remove the seemingly superfluous ones through *Feature Selection* strategies. 
+In addition, for the *Multinomial Logistic Regression*, *Linear Discriminant Analysis* and *Quadratic Discriminant Analysis* it will be necessary to select a baseline; all of these models automatically set it by default considering the first or last class.
+ 
+ 
+<!--
+Non è sufficiente guardare i grafici relativi ai plot delle correlazioni lineari (e multicollineari) perché vi potrebbero essere anche relazioni non lineari.
+-->
+ 
+ 
+## 4.1 Multinomial Logistic Regression
+ 
+The first classification model we are going to test is *Multinomial Logistic Regression*, which is a multiclass generalization of *Logistic Regression*. We start by fitting the complete model, considering all features, and then move on to discard seemingly superfluous ones through *feature selection* strategies.
+Specifically, we will first implement Backward Selection strategies, and later Forward Selection strategies as well.
+Although high test accuracies were achieved by all these models, as we will see Backward Selection is still able to gain a few percentage points in accuracy.
+To avoid making the report too heavy, in the following we will show only the final models achieved.
+Following feature selection, we will also take a look at the behavior of the regularized models by considering $L_1$ (Lasso) and $L_2$ (Ridge) penalty terms.
+ 
+<!--
+La Softmax Regression (i.e. Multinomial Logistic Regression) è comunque una generalized linear model, quindi va fittato per maximum lakelyhood, dunque i coeefficienti asintotcamente risultano normali e unbiased; dunque tramite il p-value possiamo procedere con strategie di feature selection.
+-->
+ 
+ 
+We therefore begin by training the model considering the whole set of features.
+ 
+```{r}
+ 
+# original model with all predictors
+ 
+# create formula to fit the model
+features = paste(names(X_train), collapse='+')
+formula = paste(c('y_train', features), collapse='~')
+ 
+# Fit the Multinomial Logistic Regression model
+mlr_full <- nnet::multinom(formula, data = X_train_scaled)
+# Summarize the model
+summary(mlr_full)
+ 
+# Make predictions on Training set
+y_train_pred <- predict(mlr_full, X_train_scaled)
+ 
+# Model accuracy on Training set
+cat("Training set accuracy: ", mean(y_train_pred == y_train),"\n")
+ 
+# Make predictions on Test set
+y_test_pred <- predict(mlr_full, X_test_scaled)
+ 
+# Model accuracy on Test set
+cat("Test set accuracy: ", mean(y_test_pred == y_test))
+ 
+```
+ 
+Unfortunately, the *multinom()* function of the *nnet* package does not automatically provide the p-values. Let us compute them manually:
+ 
+```{r}
+ 
+# let's compute the p-values
+z <- summary(mlr_full)$coefficients/summary(mlr_full)$standard.errors
+p <- (1 - pnorm(abs(z), 0, 1)) * 2
+p
+ 
+```
+ 
+ 
+Now we use these p-values to put Backward Selection into practice: we proceed recursively, discarding the least significant predictor at each iteration. We obtain the final model, consisting only of the features: *battery_power*, *int_memory*, *mobile_wt*, *n_cores*, *px_height*, *px_width* and *ram*.
+ 
+```{r}
+ 
+# Final model after BACKWARD SELECTION
+ 
+# create formula to fit the model
+features = paste(names(X_train[,-c(19, 18, 2, 8, 6, 15, 17, 4, 16, 5, 3, 11, 20)]), collapse='+')
+formula = paste(c('y_train', features), collapse='~')
+ 
+# Fit the Multinomial Logistic Regression model
+mlr_BS <- nnet::multinom(formula, data = X_train_scaled)
+# Summarize the model
+summary(mlr_BS)
+ 
+# Make predictions on Training set
+y_train_pred <- predict(mlr_BS, X_train_scaled)
+ 
+# Model accuracy on Training set
+cat("Training set accuracy: ", mean(y_train_pred == y_train),"\n")
+ 
+# Make predictions on Test set
+y_test_pred <- predict(mlr_BS, X_test_scaled)
+ 
+# Model accuracy on Test set
+cat("Test set accuracy: ", mean(y_test_pred == y_test))
+ 
+```
+ 
+As can be seen below, the remaining features are all significant:
+ 
+```{r}
+ 
+# let's compute the p-values
+z <- summary(mlr_BS)$coefficients/summary(mlr_BS)$standard.errors
+p <- (1 - pnorm(abs(z), 0, 1)) * 2
+p
+ 
+```
+ 
+In particular, with Backward Selection we were able to greatly simplify the model and slightly increase the accuracy on test set, moving from 97.5% to 97.75%.
+We now proceed with Forward Selection: starting from the model made only of the intercept, we use the cross validation error to iteratively add the most relevant features. 
+ 
+```{r}
+ 
+# define function 'not in'. It will be useful for Forward Selection
+ `%nin%` = Negate(`%in%`)
+ 
+```
+ 
+```{r, echo=TRUE, results='hide'}
+ 
+# FORWARD SELECTION
+ 
+# From X_train take 25% of samples to use as validation set to monitor cross validation error
+set.seed(1)
+training_smp = sample.int(nrow(X_train), nrow(X_train)*75/100, replace=FALSE)
+#validation_smp = setdiff(1:nrow(X_train), training_smp)
+ 
+for( i in 1:length(X_train) ){
+ 
+  if (i %nin% c(14, 12, 1, 13, 9, 2)){
+ 
+    # create formula to fit the model
+    features = paste(names(X_train[, c(14, 12, 1, 13, 9, 2, i)]), collapse='+')
+    formula = paste(c('y_train', features), collapse='~')
+ 
+    cat('\n',i, '\n')
+    # Fit the Multinomial Logistic Regression model
+    mlr <- nnet::multinom(formula, data = X_train_scaled, subset = training_smp)
+    # Summarize the model
+    summary(mlr)
+ 
+ 
+    # Make predictions on Training set
+    y_train_pred <- predict(mlr, X_train_scaled[training_smp, ])
+ 
+    # Model accuracy on Training set
+    cat("Training set accuracy: ", mean(y_train_pred == y_train[training_smp]),"\n")
+ 
+    # Make predictions on Validation set
+    y_val_pred <- predict(mlr, X_train_scaled[-training_smp, ])
+ 
+    # Model accuracy on Validation set
+    cat("Validation set accuracy: ", mean(y_val_pred == y_train[-training_smp]))
+ 
+  }
+}
+ 
+```
+ 
+We obtain the final model, consisting only of the following features: *battery_power*, *mobile_wt*, *px_height*, *px_width* and *ram*.
+ 
+```{r}
+ 
+# final model after FORWARD SELECTION
+ 
+# create formula to fit the model
+features = paste(names(X_train[, c(14, 12, 1, 13, 9)]), collapse='+')
+formula = paste(c('y_train', features), collapse='~')
+ 
+# Fit the Multinomial Logistic Regression model
+mlr_FS <- nnet::multinom(formula, data = X_train_scaled)
+# Summarize the model
+summary(mlr_FS)
+ 
+# Make predictions on Training set
+y_train_pred <- predict(mlr_FS, X_train_scaled)
+ 
+# Model accuracy on Training set
+cat("Training set accuracy: ", mean(y_train_pred == y_train),"\n")
+ 
+# Make predictions on Test set
+y_test_pred <- predict(mlr_FS, X_test_scaled)
+ 
+# Model accuracy on Test set
+cat("Test set accuracy: ", mean(y_test_pred == y_test))
+ 
+```
+
+Specifically in this case we notice instead a decrease in accuracy, going from 97.5% to 96.75% on the test set. However, the obtained model is considerably simpler since only five features are considered.
+Before proceeding with the regularized models, we also try to fit a reduced model considering only the feature related to *ram*, since from the initial analysis it was found to be the variable most correlated with the *price_range*.
+ 
+```{r}
+ 
+# Fit the model
+mlr_ram <- nnet::multinom(y_train ~ ram, data = X_train_scaled)
+# Summarize the model
+summary(mlr_ram)
+ 
+# Make predictions on Training set
+y_train_pred <- predict(mlr_ram, X_train_scaled)
+ 
+# Model accuracy on Training set
+cat("Training set accuracy: ", mean(y_train_pred == y_train),"\n")
+ 
+# Make predictions on Test set
+y_test_pred <- predict(mlr_ram, X_test_scaled)
+ 
+# Model accuracy on Test set
+cat("Test set accuracy: ", mean(y_test_pred == y_test))
+ 
+```
+ 
+Contrary to what one could expect from the preprocessing phase, *ram* is actually not the only relevant feature. Indeed, we can see that in this second case the accuracy obtained is significantly reduced, by about 20%.
+ 
+```{r, eval = FALSE, include = FALSE}
+ 
+comparison = anova(mlr_ram, mlr_full, test = 'Chisq')
+summary(comparison)
+ 
+```
+ 
+Finally, we also take a look at the regularized models (Lasso and Ridge Regression, respectively).
+To find the optimal hyperparameter $\lambda$ we will use cross-validation strategies.
+ 
+```{r echo=TRUE, results=FALSE, warning=FALSE}
+library(glmnet)
+```
+
+```{r, warning = FALSE} 
+ 
+# Lasso Regression
+mlr_lasso = cv.glmnet(as.matrix(X_train_scaled), y_train, alpha=1, family="multinomial")
+ 
+# Ridge Regression
+mlr_ridge = cv.glmnet(as.matrix(X_train_scaled), y_train, alpha=0, family="multinomial")
+ 
+par(mfrow = c(1, 2))
+ 
+plot(mlr_lasso)#, main ='Lasso Regularization')
+plot(mlr_ridge)#, main ='Ridge Regularization')
+ 
+par(mfrow = c(1, 1))
+ 
+```
+ 
+```{r}
+ 
+cf_lasso = coef(mlr_lasso, s = mlr_lasso$lambda.min)
+cf_ridge = coef(mlr_ridge, s = mlr_ridge$lambda.min)
+ 
+```
+ 
+Coefficients found by Lasso Regularization:
+ 
+```{r}
+ 
+cf_lasso
+ 
+```
+ 
+Coefficients found by Ridge Regularization: 
+ 
+```{r}
+ 
+cf_ridge 
+ 
+```
+ 
+Below we calculate accuracies on training and test sets, both for Lasso and Ridge:
+ 
+```{r}
+ 
+# LASSO predictions 
+ 
+# Make predictions on Training set
+y_train_pred <- predict(mlr_lasso, newx = as.matrix(X_train_scaled), s = "lambda.min",  
+                        type = "class")
+ 
+# Model accuracy on Training set
+cat("Training set accuracy with LASSO: ", mean(y_train_pred == y_train),"\n")
+ 
+# Make predictions on Test set
+y_test_pred <- predict(mlr_lasso, newx = as.matrix(X_test_scaled), s = "lambda.min", 
+                       type = "class")
+ 
+# Model accuracy on Test set
+cat("Test set accuracy with LASSO: ", mean(y_test_pred == y_test))
+ 
+```
+ 
+```{r}
+ 
+# RIDGE predictions
+ 
+# Make predictions on Training set
+y_train_pred <- predict(mlr_ridge , newx = as.matrix(X_train_scaled), s = "lambda.min",  
+                        type = "class")
+ 
+# Model accuracy on Training set
+cat("Training set accuracy with RIDGE: ", mean(y_train_pred == y_train),"\n")
+ 
+# Make predictions on Test set
+y_test_pred <- predict(mlr_ridge, newx = as.matrix(X_test_scaled), s = "lambda.min",  
+                       type = "class")
+ 
+# Model accuracy on Test set
+cat("Test set accuracy with RIDGE: ", mean(y_test_pred == y_test))
+ 
+```
+ 
+As we can see, the accuracy achieved by Lasso is about the same as the one obtained with the model made of all features. Ridge on the other hand performed considerably worse, losing about 10% in accuracy.
+ 
+ 
+ 
+## 4.2 Linear Discriminant Analysis
+ 
+In this section we implement *Linear Discriminant Analysis*. As in the previous case, we start by using all the provided features, and then apply Forward Selection to select the most useful ones.
+Before implementing this algorithm though, we need to check whether the data within each class approximately follows a multivariate normal distribution.
+To do this we use the multivariate *QQ-plots*, given below:
+ 
+<!-- per eseguire mqqnorm bisogna installare il pacchetto RVAideMemoire -->
+
+```{r echo=TRUE, results=FALSE, warning=FALSE}
+library('RVAideMemoire')
+```
+
+```{r, echo=TRUE,results='hide',fig.keep='all', warning=FALSE}
+ 
+par(mfrow = c(2,2))
+ 
+mqqnorm(X_train[y_train == 0, ], main = "Multi-normal Q-Q Plot for class 0")
+mqqnorm(X_train[y_train == 1, ], main = "Multi-normal Q-Q Plot for class 1")
+mqqnorm(X_train[y_train == 2, ], main = "Multi-normal Q-Q Plot for class 2")
+mqqnorm(X_train[y_train == 3, ], main = "Multi-normal Q-Q Plot for class 3")
+ 
+par(mfrow = c(1,1))
+ 
+```
+ 
+From the figures above we can see that the data appears to follow a multivariate normal distribution.
+We then proceed with the implementation of *Linear Discriminant Analysis*; initially we keep the entire feature set.
+ 
+```{r echo=TRUE, results=FALSE, warning=FALSE}
+library(MASS)
+```
+
+```{r}
+
+# original model considering all features
+LDA <- lda(y_train~. , data = X_train_scaled)
+ 
+# plot LDA
+plot(LDA, col = c('blue','red','yellow','darkgreen')[factor(y_train)])
+```
+```{r}
+ 
+# Make predictions on Training set
+y_train_pred <- predict(LDA, X_train_scaled)
+ 
+# Model accuracy on Training set
+cat("Training set accuracy: ", mean(y_train_pred$class == y_train),"\n")
+ 
+# plot confusion matrix for Training set
+cat("Confusion Matrix for the Training set:", "\n")
+CM_train <- table(y_train_pred$class, y_train)
+CM_train
+ 
+cat("\n\n")
+ 
+# Make predictions on Test set
+y_test_pred <- predict(LDA, X_test_scaled)
+ 
+# Model accuracy on Test set
+cat("Test set accuracy: ", mean(y_test_pred$class == y_test),'\n')
+ 
+# plot confusion matrix for Test set
+cat("Confusion Matrix for the Test set:", "\n")
+CM_test <- table(y_test_pred$class, y_test)
+CM_test
+ 
+```
+ 
+Now we try to implement the model using the same features selected for Multinomial Logistic Regression through Forward Selection:
+ 
+```{r}
+ 
+# Linear Discriminant Analysis with the same features
+# found for the Multinomial Logistic Regression model, through Forward Selection
+ 
+# Fit the Linear Discriminant Analysis model
+LDA <- lda(y_train~ram+px_height+battery_power+px_width+mobile_wt, data = X_train_scaled)
+ 
+# plot LDA
+plot(LDA, col = c('blue','red','yellow','darkgreen')[factor(y_train)])
+ 
+```
+ 
+```{r}
+ 
+# Make predictions on Training set
+y_train_pred <- predict(LDA, X_train_scaled)
+ 
+# Model accuracy on Training set
+cat("Training set accuracy: ", mean(y_train_pred$class == y_train),"\n")
+ 
+# plot confusion matrix for Training set
+cat("Confusion Matrix for the Training set:", "\n")
+CM_train <- table(y_train_pred$class, y_train)
+CM_train
+ 
+cat("\n\n")
+ 
+# Make predictions on Test set
+y_test_pred <- predict(LDA, X_test_scaled)
+ 
+# Model accuracy on Test set
+cat("Test set accuracy: ", mean(y_test_pred$class == y_test),'\n')
+ 
+# plot confusion matrix for Test set
+cat("Confusion Matrix for the Test set:", "\n")
+CM_test <- table(y_test_pred$class, y_test)
+CM_test
+ 
+```
+ 
+We now implement *Linear Discriminant Analysis* using the same features selected for Multinomial Logistic Regression through backward selection:
+ 
+```{r}
+ 
+# Linear Discriminant Analysis with the same features found
+# for the Multinomial Logistic Regression model, through Backward Selection
+ 
+# Fit the Linear Discriminant Analysis model
+LDA <- lda(y_train~ram+battery_power+int_memory+mobile_wt+n_cores+px_height+px_width, 
+           data = X_train_scaled)
+ 
+# plot LDA
+plot(LDA, col = c('blue','red','yellow','darkgreen')[factor(y_train)])
+ 
+```
+ 
+```{r}
+# Make predictions on Training set
+y_train_pred <- predict(LDA, X_train_scaled)
+ 
+# Model accuracy on Training set
+cat("Training set accuracy: ", mean(y_train_pred$class == y_train),"\n")
+ 
+# plot confusion matrix for Training set
+cat("Confusion Matrix for the Training set:", "\n")
+CM_train <- table(y_train_pred$class, y_train)
+CM_train
+ 
+cat("\n\n")
+ 
+# Make predictions on Test set
+y_test_pred <- predict(LDA, X_test_scaled)
+ 
+# Model accuracy on Test set
+cat("Test set accuracy: ", mean(y_test_pred$class == y_test),'\n')
+ 
+# plot confusion matrix for Test set
+cat("Confusion Matrix for the Test set:", "\n")
+CM_test <- table(y_test_pred$class, y_test)
+CM_test
+ 
+```
+
+Finally we proceed with Forward Selection. It will be interesting to check whether the most important features for Linear Discriminant Analysis coincide with those for Multinomial Logistic Regression, or whether there are variations.
+In order not to make the report too heavy to read, below the script with only the final features is given.
+ 
+```{r}
+ 
+# final model after FORWARD SELECTION 
+ 
+# Fit the Linear Discriminant Analysis model
+LDA <- lda(y_train~ram+battery_power+px_height+px_width+mobile_wt+wifi+sc_w, data = X_train_scaled)
+ 
+# plot LDA
+plot(LDA, col = c('blue','red','yellow','darkgreen')[factor(y_train)])
+ 
+```
+ 
+```{r}
+ 
+# Make predictions on Training set
+y_train_pred <- predict(LDA, X_train_scaled)
+ 
+# Model accuracy on Training set
+cat("Training set accuracy: ", mean(y_train_pred$class == y_train),"\n")
+ 
+# plot confusion matrix for Training set
+cat("Confusion Matrix for the Training set:", "\n")
+CM_train <- table(y_train_pred$class, y_train)
+CM_train
+ 
+cat("\n\n")
+ 
+# Make predictions on Test set
+y_test_pred <- predict(LDA, X_test_scaled)
+ 
+# Model accuracy on Test set
+cat("Test set accuracy: ", mean(y_test_pred$class == y_test),'\n')
+ 
+# plot confusion matrix for Test set
+cat("Confusion Matrix for the Test set:", "\n")
+CM_test <- table(y_test_pred$class, y_test)
+CM_test
+ 
+```
+ 
+To conclude, we notice that all the different models we tested perform relatively well, achieving high accuracies both on training and test sets. The best model (in terms of test set accuracy) obtained is the one in which Forward Selection is applied. In this case the accuracy achieved on the test set is almost the same as the one we obtained with Multinomial Logistic Regression with Backward Selection. However, the feature sets retained in these two models turn out to be different.
+In the following section we will go on to implement a generalization of *Linear Discriminant Analysis*, namely *Quadratic Discriminant Analysis*.
+ 
+ 
+## 4.3 Quadratic Discriminant Analysis
+ 
+An important assumption of the LDA is that all groups share the same variance matrix. In our case however, while similar on many of the entries, these matrices still have some significantly different values. This prompted us to also test the *Quadratic Discriminant Analysis*, which does not assume equal variance across groups instead.
+As in the previous case, we will start by testing the full model with all features, we will then go on to test the reduced models considering only the feature sets obtained by: Backward/Forward Selection on the Multinomial Logistic Regression, Forward Selection on the LDA, and then we will conclude by implementing the actual Forward Selection in this case as well.
+ 
+```{r}
+
+# original model considering all features
+QDA <- qda(y_train~. , data = X_train_scaled)
+ 
+# Make predictions on Training set
+y_train_pred <- predict(QDA, X_train_scaled)
+ 
+# Model accuracy on Training set
+cat("Training set accuracy: ", mean(y_train_pred$class == y_train),"\n")
+ 
+# plot confusion matrix for Training set
+cat("Confusion Matrix for the Training set:", "\n")
+CM_train <- table(y_train_pred$class, y_train)
+CM_train
+ 
+cat("\n\n")
+ 
+# Make predictions on Test set
+y_test_pred <- predict(QDA, X_test_scaled)
+ 
+# Model accuracy on Test set
+cat("Test set accuracy: ", mean(y_test_pred$class == y_test),'\n')
+ 
+# plot confusion matrix for Test set
+cat("Confusion Matrix for the Test set:", "\n")
+CM_test <- table(y_test_pred$class, y_test)
+CM_test
+ 
+```
+Now let's consider a reduced model keeping just the features selected for Multinomial Logistic Regression through Forward Selection:
+ 
+```{r}
+ 
+# Quadratic Discriminant Analysis with the same features found 
+# for the Multinomial Logistic Regression model, through Forward Selection
+ 
+# Fit the Linear Discriminant Analysis model
+QDA <- qda(y_train~ram+px_height+battery_power+px_width+mobile_wt, data = X_train_scaled)
+ 
+# Make predictions on Training set
+y_train_pred <- predict(QDA, X_train_scaled)
+ 
+# Model accuracy on Training set
+cat("Training set accuracy: ", mean(y_train_pred$class == y_train),"\n")
+ 
+# plot confusion matrix for Training set
+cat("Confusion Matrix for the Training set:", "\n")
+CM_train <- table(y_train_pred$class, y_train)
+CM_train
+ 
+cat("\n\n")
+ 
+# Make predictions on Test set
+y_test_pred <- predict(QDA, X_test_scaled)
+ 
+# Model accuracy on Test set
+cat("Test set accuracy: ", mean(y_test_pred$class == y_test),'\n')
+ 
+# plot confusion matrix for Test set
+cat("Confusion Matrix for the Test set:", "\n")
+CM_test <- table(y_test_pred$class, y_test)
+CM_test
+ 
+```
+
+We now implement *Quadratic Discriminant Analysis* using the same features selected for Multinomial Logistic Regression through Backward Selection:
+ 
+```{r}
+ 
+# Quadratic Discriminant Analysis with the same features found
+# for the Multinomial Logistic Regression model, through Backward Selection
+ 
+# Fit the Linear Discriminant Analysis model
+QDA <- qda(y_train~ram+battery_power+int_memory+mobile_wt+n_cores+px_height+px_width, 
+           data = X_train_scaled)
+ 
+# Make predictions on Training set
+y_train_pred <- predict(QDA, X_train_scaled)
+ 
+# Model accuracy on Training set
+cat("Training set accuracy: ", mean(y_train_pred$class == y_train),"\n")
+ 
+# plot confusion matrix for Training set
+cat("Confusion Matrix for the Training set:", "\n")
+CM_train <- table(y_train_pred$class, y_train)
+CM_train
+ 
+cat("\n\n")
+ 
+# Make predictions on Test set
+y_test_pred <- predict(QDA, X_test_scaled)
+ 
+# Model accuracy on Test set
+cat("Test set accuracy: ", mean(y_test_pred$class == y_test),'\n')
+ 
+# plot confusion matrix for Test set
+cat("Confusion Matrix for the Test set:", "\n")
+CM_test <- table(y_test_pred$class, y_test)
+CM_test
+ 
+```
+Let's also test the model using the same features selected for LDA through Forward Selection.
+ 
+```{r}
+ 
+# Quadratic Discriminant Analysis with the same features found 
+# for LDA model, through Forward Selection
+ 
+# Fit the Linear Discriminant Analysis model
+QDA <- qda(y_train~ram+battery_power+px_height+px_width+mobile_wt+wifi+sc_w, data = X_train_scaled)
+ 
+# Make predictions on Training set
+y_train_pred <- predict(QDA, X_train_scaled)
+ 
+# Model accuracy on Training set
+cat("Training set accuracy: ", mean(y_train_pred$class == y_train),"\n")
+ 
+# plot confusion matrix for Training set
+cat("Confusion Matrix for the Training set:", "\n")
+CM_train <- table(y_train_pred$class, y_train)
+CM_train
+ 
+cat("\n\n")
+ 
+# Make predictions on Test set
+y_test_pred <- predict(QDA, X_test_scaled)
+ 
+# Model accuracy on Test set
+cat("Test set accuracy: ", mean(y_test_pred$class == y_test),'\n')
+ 
+# plot confusion matrix for Test set
+cat("Confusion Matrix for the Test set:", "\n")
+CM_test <- table(y_test_pred$class, y_test)
+CM_test
+ 
+```
+ 
+To conclude let's now proceed with the actual Forward Selection. For simplicity we will just report the final model.
+ 
+```{r}
+ 
+# final model after FORWARD SELECTION
+ 
+# Fit the Linear Discriminant Analysis model
+QDA <- qda(y_train ~ ram+battery_power+clock_speed+mobile_wt+px_height+px_width+fc, 
+           data = X_train_scaled)
+ 
+# Make predictions on Training set
+y_train_pred <- predict(QDA, X_train_scaled)
+ 
+# Model accuracy on Training set
+cat("Training set accuracy: ", mean(y_train_pred$class == y_train),"\n")
+ 
+# plot confusion matrix for Training set
+cat("Confusion Matrix for the Training set:", "\n")
+CM_train <- table(y_train_pred$class, y_train)
+CM_train
+ 
+cat("\n\n")
+ 
+# Make predictions on Test set
+y_test_pred <- predict(QDA, X_test_scaled)
+ 
+# Model accuracy on Test set
+cat("Test set accuracy: ", mean(y_test_pred$class == y_test),'\n')
+ 
+# plot confusion matrix for Test set
+cat("Confusion Matrix for the Test set:", "\n")
+CM_test <- table(y_test_pred$class, y_test)
+CM_test
+ 
+```
+ 
+Even in this case, the accuracies achieved both on the training and the test set are considerably high, even though *Quadratic Discriminant Analysis* seemed to perform slightly worse than the other models tested so far.
+The maximum achieved accuracy on the test set is about 96.25%.
+In the following section we will go on to implement a final multiclass classification model, the *K-NN*.
+ 
+ 
+## 4.4 K-Nearest Neighbors
+ 
+The last classification model we are going to train is the *K-Nearest Neighbors*. In particular we will use a *10-Fold Cross Validation* approach, with a grid-search over the parameter K, number of Neighbors. We will test the model first on the original dataset and then after applying a scaling to the data.
+ 
+```{r echo=TRUE, results=FALSE, warning=FALSE}
+library(ISLR)
+```
+ 
+```{r, warning=FALSE} 
+ 
+# train the K-Nearest Neighbors with the original Dataset 
+ 
+set.seed(1)
+ctrl <- trainControl(method="repeatedcv", repeats = 5)
+knn <- train(as.factor(price_range) ~ ., data = Training_set, method = "knn", trControl = ctrl, 
+             tuneLength = 20)
+ 
+# Output of kNN fit
+knn
+ 
+```
+ 
+Below is the figure regarding the behavior of accuracy versus K values.
+ 
+```{r}
+ 
+plot(knn, main="Accuracy vs #Neighbors")
+ 
+```
+ 
+ 
+```{r}
+ 
+y_train_pred <- predict(knn,newdata = Training_set)
+ 
+# Model accuracy on Training set
+cat("Training set accuracy: ", mean(y_train_pred == as.factor(y_train)), '\n')
+ 
+# Get the confusion matrix to see accuracy value and other parameter values
+table(y_train_pred, as.factor(y_train))
+ 
+ 
+y_test_pred <- predict(knn,newdata = Test_set)
+ 
+# Model accuracy on Test set
+cat("\nTest set accuracy: ", mean(y_test_pred == as.factor(y_test)), '\n')
+ 
+# Get the confusion matrix to see accuracy value and other parameter values
+table(y_test_pred, as.factor(y_test))
+ 
+```
+ 
+We now implement again the same model, but this time after applying standard scaling to the data. That is, the data is centered (the mean is subtracted) and rescaled (i.e., divided by the standard deviation).
+ 
+<!-- 
+Scale è lo Standard Scaler.
+Invece Center toglie solamente la media dei dati a ciascun dato.
+-->
+ 
+```{r, warning=FALSE}
+ 
+# train the K-Nearest Neighbors with scaled data
+ 
+set.seed(1)
+ctrl <- trainControl(method="repeatedcv", repeats = 5)
+knn <- train(as.factor(price_range) ~ ., data = Training_set, method = "knn", trControl = ctrl, 
+             tuneLength = 20, preProcess = c("center","scale"))
+ 
+# Output of kNN fit
+knn
+ 
+```
+ 
+Below we visualize the behavior of accuracy with respect to K values.
+ 
+```{r}
+ 
+plot(knn, main="Accuracy vs #Neighbors")
+ 
+```
+ 
+ 
+```{r}
+ 
+y_train_pred <- predict(knn,newdata = Training_set)
+ 
+# Model accuracy on Training set
+cat("Training set accuracy: ", mean(y_train_pred == as.factor(y_train)), '\n')
+ 
+# Get the confusion matrix to see accuracy value and other parameter values
+table(y_train_pred, as.factor(y_train))
+ 
+ 
+y_test_pred <- predict(knn,newdata = Test_set)
+ 
+# Model accuracy on Test set
+cat("\nTest set accuracy: ", mean(y_test_pred == as.factor(y_test)), '\n')
+ 
+# Get the confusion matrix to see accuracy value and other parameter values
+table(y_test_pred, as.factor(y_test))
+ 
+```
+ 
+Surprisingly, the *K-NN*  performs worse on the scaled data than it does on the original dataset. As we can see from the confusion matrices, the model struggles on multiple classes and in fact this is the worst among all the implemented models. Among the values we tested, the best K turns out to be 41. We notice though that the plot shows an increasing trend, so we may wonder if increasing the values of K may actually lead to better accuracy scores. 
+Interestingly, from additional tests we will not report here, it turned out that such an increase becomes more and more insignificant as K grows larger, leading the accuracies to stabilize around the above obtained thresholds.
+In any case, both these *K-NN* models fail to achieve the same performance obtained with *Multinomial Logistic Regression*, *Linear Discriminant Analysis* and *Quadratic Discriminant Analysis*.
+ 
+ 
+# 5. Conclusions
+ 
+In this report we dealt with a mobile price classification problem, which consists of assigning to each observation one of the following four labels: 
+ 
+- 0 (low-cost);
+- 1 (medium-cost);
+- 2 (high-cost);
+- 3 (very high-cost).
+ 
+We began with the preprocessing phase in which after analyzing the structure of the dataset, we checked for the presence of missing values, class balancing, and we applied feature scaling.
+After that, we proceeded with an Exploratory Data Analysis in which we checked for possible relationships (linear, multicollinear and nonlinear) among the various predictors. From this first analysis we found that the variable *ram* appears to be the most correlated with the *price range*. However, in the training phase it later turned out not to be the only relevant feature.
+Specifically, in the training part we implemented four different supervised learning algorithms:
+ 
+- Multinomial Logistic Regression;
+- Linear Discriminant Analysis;
+- Quadratic Discriminant Analysis;
+- K-Nearest Neighbors.
+ 
+For the Multinomial Logistic Regression, we trained the model first by considering the entire feature set; then we applied Backward Selection using *p-values* and Forward Selection by exploiting the *cross-validation error*. We then went on to compare the full model with the reduced model, in which we considered only the *ram* variable. This comparison, as mentioned above, showed that *ram* alone is not sufficient to correctly classify the observations.
+Finally, we also tested the regularized models by considering the $L_1$ and $L_2$ penalty terms (*Lasso* and *Ridge*).
+ 
+We then implemented the Linear Discriminant Analysis, though only after checking that the data within each class roughly followed a multivariate normal distribution. We first considered the entire feature set, then we tested the model using the same predictors derived with Backward and Forward Selection as in the Multinomial case. Lastly, we also applied an actual Forward Selection.
+ 
+We did the same for the Quadratic Discriminant Analysis as well. As before, we firstly tested the model keeping all the features, then we tested it considering just the feature sets obtained through Backward/Forward Selection on the previous models and then we implemented an actual Forward Selection.
+ 
+At the end, we implemented the *K-Nearest Neighbors* using both the original dataset and a scaled version of it. In both cases we made use of a grid-search to find the best-fitting neighbors value and a 10-Fold Cross Validation.
+ 
+Below we report the results obtained with all implemented models. In the following, (BWS) and (FWS) stand for Backward and Forward Selection, respectively.
+ 
+ 
+| **Model** | **Train set accuracy** (%) | **Test set accuracy** (%)| 
+| ----------- |:-----------:|:-----------:| 
+| *Multinomial Logistic Regression* (Full Dataset)| 99.50 | 97.50 |
+| *Multinomial Logistic Regression* (BWS)| 98.50 | 97.75 |
+| *Multinomial Logistic Regression* (FWS)| 98.31 | 96.75 |
+| *Multinomial Logistic Regression* (ram only)| 74.94 | 78.75 |
+| *Multinomial Logistic Regression* (Lasso)| 98.94 | 97.50 |
+| *Multinomial Logistic Regression* (Ridge)| 87.56 | 85.25 |
+| *Linear Discriminant Analysis* (Full Dataset) | 95.25 | 96.25 | 
+| *Linear Discriminant Analysis* (FWS Multinom.) | 95.38 | 96.25 | 
+| *Linear Discriminant Analysis* (BWS Multinom.) | 95.00 | 96.25 | 
+| *Linear Discriminant Analysis* (FWS) | 95.88 | 97.50 | 
+| *Quadratic Discriminant Analysis* (Full Dataset) | 96.50 | 94.00 | 
+| *Quadratic Discriminant Analysis* (FWS Multinom.) | 97.00 | 96.25 | 
+| *Quadratic Discriminant Analysis* (BWS Multinom.) | 96.50 | 96.25 | 
+| *Quadratic Discriminant Analysis* (FWS LDA) | 96.63 | 96.00 | 
+| *Quadratic Discriminant Analysis* (FWS) | 96.69 | 95.75 | 
+| *K-NN* (not scaled) | 94.56 | 94.75 |
+| *K-NN* (scaled) | 68.44 | 66.75 |
+ 
+In general, all implemented models but K-NN (scaled) and Multinomial Logistic Regression (ram only), perform very well; the highest accuracy value achieved on the test set is 97.75%, obtained by the Multinomial Logistic Regression (BWS). 
+Anyway, there are also other models more or less satisfactory, like: *Multinomial Logistic Regression* (Full Dataset), *Multinomial Logistic Regression* (LASSO) and *Linear Discrimininat Analysis* (FWS), which are able to reach an accuracy value of about 97.50% on test set.
+ 
+ 
+\section{Bibliography}
+
+[1] <https://www.kaggle.com/datasets/iabhishekofficial/mobile-price-classification>.
+
+[2] *The Elements of Statistical Learning, Data Mining, Inference and Prediction*, Hastie T., Tibshirani R. and Friedman J. (2009).
+
+[3] *An Introduction to Statistical Learning*, James G., Witten D., Hastie T. and Tibshirani R. (2021).
