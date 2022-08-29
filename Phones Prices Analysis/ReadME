@@ -1,1 +1,10 @@
-
+Phones Prices Analysis is the final project of my statistical learning course, carried out in collaboration with two of my colleagues.
+As the title suggests, we conducted a statistical analysis of a set of phone prices in order to predict the best price range for a new phone.
+Since there are 4 different price ranges, we are dealing with a multiclass classification problem.
+The project is written completely in R, using RStudio, and the report is produced using R Markdown.
+The complete code can be found in the .txt file. The two pdf files, on the other hand, refer to the report and the presentation slides.
+As you will see from the report, the project is structured mainly in 3 parts:
+- first we preprocess and clean the data;
+- then we perform a statistical analysis trying to infer interesting relationships among the predictors;
+- finally we implement various ML algorithms, also considering some greedy feature selection techniques based on statistical inference.
+It was certainly interesting to work on and I hope you will find it equally interesting to read!
