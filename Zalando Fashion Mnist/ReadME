@@ -1,1 +1,8 @@
-
+This is my first ML project ever, in which I address the image classification problem proposed by the Zalando Fashion Mnist dataset.
+This project considers only the most basic ML algorithms, without resorting to convolutional NNs and more advanced DL techniques.
+The goal is to find a classification algorithm that can achieve a reasonable level of accuracy.
+In our case, using the Support Vector Machine (after dimensionality reduction by PCA) we were able to achieve an accuracy of 99.88% on the training set, 
+89.96% on the validation set and 89.57% on the test set.
+We also experimented with different algorithms such as: Decision Tree, Random Forests, k-Nearest-Neighbours, Multinomial Logistic Regression and MLP, 
+but none of these performed as good as SVM on the test set.
+It was definitely not the most fun project I worked on, but it was interesting nonenthless.
