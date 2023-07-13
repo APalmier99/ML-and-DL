@@ -1,1 +1,11 @@
+Summary: Feature Selection Strategies for Discriminating Malingering Attitudes
 
+This project was developed in collaboration with a colleague of mine for the Cognitive Behavioural and Social Data course.
+The main focus is on devising feature selection strategies to determine the most relevant features for discriminating malingering attitudes
+from psychological questionnaires. The aim is to identify whether a patient is faking symptoms or not.
+The project explores both supervised and unsupervised feature selection strategies to address this problem across multiple datasets. 
+The datasets represent binary classification problems, where the goal is to distinguish between genuine responses and malingering attitudes.
+For unsupervised feature selection, Principal Component Analysis (PCA), Sparse PCA, and Variance Thresholding techniques were implemented. These methods aim to uncover underlying patterns and reduce the dimensionality of the feature space.
+In addition, various supervised feature selection strategies were developed, including greedy forward and backward selection approaches. These strategies differ in the evaluation criteria used to determine the relevance of features. Some strategies employ p-values, while others utilize Akaike/Bayes Information Criterion or accuracy as metrics for feature selection.
+The project ensures consistency across different datasets, providing robust and reliable feature selection strategies applicable to various scenarios.
+The combination of supervised and unsupervised strategies, along with the exploration of various evaluation criteria, enhances the accuracy and effectiveness of the feature selection process.
